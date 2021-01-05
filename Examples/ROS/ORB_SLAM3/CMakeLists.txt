@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.5)
 project(orbslam3_ros2)
 
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../../../cmake_modules)
+
+
 # Default to C99
 if(NOT CMAKE_C_STANDARD)
   set(CMAKE_C_STANDARD 99)
@@ -15,33 +18,47 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# include additional directories
-include_directories(/opt/ros/foxy/include)
+## Find packages
 
-# find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(ament_cmake_ros REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(nav_msgs REQUIRED) # rgbd
+find_package(cv_bridge REQUIRED)
+find_package(Eigen3 3.1.0 REQUIRED)
+find_package(Pangolin REQUIRED)
 
-# LIST(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../../../cmake_modules)
-
-find_package(OpenCV 3.0 QUIET)
+find_package(OpenCV 4 QUIET)
 if(NOT OpenCV_FOUND)
-   find_package(OpenCV 2.4.3 QUIET)
+  find_package(OpenCV 3.0 QUIET) 
    if(NOT OpenCV_FOUND)
-      find_package(OpenCV 4 QUIET)
+      find_package(OpenCV 2.4.3 QUIET)
       if(NOT OpenCV_FOUND)
         message(FATAL_ERROR "OpenCV > 2.4.3 not found.")
+        END
       endif()
    endif()
 endif()
 
-find_package(sensor_msgs REQUIRED)
-find_package(nav_msgs REQUIRED) # rgbd
-find_package(cv_bridge)
-find_package(Eigen3 3.1.0 REQUIRED)
-find_package(Pangolin REQUIRED)
-find_package(rcutils REQUIRED)
+set(dependencies
+  rclcpp
+  sensor_msgs
+  nav_msgs
+  cv_bridge
+)
+
+###########
+## Build ##
+###########
+
+# Node for RGB-D camera
+add_executable(rgbd_node
+src/rgbd_node.cpp
+)
+
+ament_target_dependencies(rgbd_node
+${dependencies}
+)
 
 include_directories(
 ${PROJECT_SOURCE_DIR}
@@ -61,36 +78,24 @@ ${PROJECT_SOURCE_DIR}/../../../lib/libORB_SLAM3.so
 -lboost_system
 )
 
-set(dependencies
-  rclcpp
-  sensor_msgs
-  nav_msgs
-  cv_bridge
+target_link_libraries(rgbd_node
+${LIBS}
 )
+
+#############
+## Install ##
+#############
 
 install(
   DIRECTORY include/
   DESTINATION include
 )
 
-# Node for RGB-D camera
-add_executable(RGBD
-src/rgbd_node.cpp
-)
-
-ament_target_dependencies(RGBD
-${dependencies}
-)
-
-target_link_libraries(RGBD
-${LIBS}
-)
-
-target_include_directories(RGBD PUBLIC
+target_include_directories(rgbd_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 
-install(TARGETS RGBD
+install(TARGETS rgbd_node
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
