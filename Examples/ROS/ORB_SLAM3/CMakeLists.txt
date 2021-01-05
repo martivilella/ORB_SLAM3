@@ -1,6 +1,16 @@
 cmake_minimum_required(VERSION 3.5)
 project(orbslam3_ros2)
 
+set(LIBS 
+${OpenCV_LIBS} 
+${EIGEN3_LIBS}
+${Pangolin_LIBRARIES}
+${PROJECT_SOURCE_DIR}/../../../Thirdparty/DBoW2/lib/libDBoW2.so
+${PROJECT_SOURCE_DIR}/../../../Thirdparty/g2o/lib/libg2o.so
+${PROJECT_SOURCE_DIR}/../../../lib/libORB_SLAM3.so
+-lboost_system
+)
+
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../../../cmake_modules)
 
 
@@ -28,14 +38,13 @@ find_package(cv_bridge REQUIRED)
 find_package(Eigen3 3.1.0 REQUIRED)
 find_package(Pangolin REQUIRED)
 
-find_package(OpenCV 4 QUIET)
+find_package(OpenCV 3.0 QUIET)
 if(NOT OpenCV_FOUND)
-  find_package(OpenCV 3.0 QUIET) 
+  find_package(OpenCV 4 QUIET) 
    if(NOT OpenCV_FOUND)
       find_package(OpenCV 2.4.3 QUIET)
       if(NOT OpenCV_FOUND)
         message(FATAL_ERROR "OpenCV > 2.4.3 not found.")
-        END
       endif()
    endif()
 endif()
@@ -47,6 +56,8 @@ set(dependencies
   cv_bridge
 )
 
+
+
 ###########
 ## Build ##
 ###########
@@ -54,6 +65,10 @@ set(dependencies
 # Node for RGB-D camera
 add_executable(rgbd_node
 src/rgbd_node.cpp
+)
+
+target_link_libraries(rgbd_node
+${LIBS}
 )
 
 ament_target_dependencies(rgbd_node
@@ -68,35 +83,25 @@ ${PROJECT_SOURCE_DIR}/../../../include/CameraModels
 ${Pangolin_INCLUDE_DIRS}
 )
 
-set(LIBS 
-${OpenCV_LIBS} 
-${EIGEN3_LIBS}
-${Pangolin_LIBRARIES}
-${PROJECT_SOURCE_DIR}/../../../Thirdparty/DBoW2/lib/libDBoW2.so
-${PROJECT_SOURCE_DIR}/../../../Thirdparty/g2o/lib/libg2o.so
-${PROJECT_SOURCE_DIR}/../../../lib/libORB_SLAM3.so
--lboost_system
-)
-
-target_link_libraries(rgbd_node
-${LIBS}
-)
-
 #############
 ## Install ##
 #############
 
-install(
-  DIRECTORY include/
-  DESTINATION include
-)
-
 target_include_directories(rgbd_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
+  $<INSTALL_INTERFACE:include>
+  )
 
 install(TARGETS rgbd_node
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
   DESTINATION lib/${PROJECT_NAME})
+
+install(
+  DIRECTORY
+  DESTINATION share/${PROJECT_NAME}/
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -111,10 +116,6 @@ endif()
 
 ament_export_include_directories(
   include
-)
-
-ament_export_targets(
-  export_${PROJECT_NAME}
 )
 
 ament_package()
