@@ -1,34 +1,29 @@
-cmake_minimum_required(VERSION 2.4.6)
-include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
+cmake_minimum_required(VERSION 3.5)
+project(orbslam3_ros2)
 
-rosbuild_init()
-
-IF(NOT ROS_BUILD_TYPE)
-  SET(ROS_BUILD_TYPE Release)
-ENDIF()
-
-MESSAGE("Build type: " ${ROS_BUILD_TYPE})
-
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall  -O3 -march=native ")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall  -O3 -march=native")
-
-# Check C++11 or C++0x support
-include(CheckCXXCompilerFlag)
-CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
-CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
-if(COMPILER_SUPPORTS_CXX11)
-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-   add_definitions(-DCOMPILEDWITHC11)
-   message(STATUS "Using flag -std=c++11.")
-elseif(COMPILER_SUPPORTS_CXX0X)
-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
-   add_definitions(-DCOMPILEDWITHC0X)
-   message(STATUS "Using flag -std=c++0x.")
-else()
-   message(FATAL_ERROR "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
+# Default to C99
+if(NOT CMAKE_C_STANDARD)
+  set(CMAKE_C_STANDARD 99)
 endif()
 
-LIST(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../../../cmake_modules)
+# Default to C++14
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 14)
+endif()
+
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+# include additional directories
+include_directories(/opt/ros/foxy/include)
+
+# find dependencies
+find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_ros REQUIRED)
+find_package(rclcpp REQUIRED)
+
+# LIST(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../../../cmake_modules)
 
 find_package(OpenCV 3.0 QUIET)
 if(NOT OpenCV_FOUND)
@@ -41,8 +36,12 @@ if(NOT OpenCV_FOUND)
    endif()
 endif()
 
+find_package(sensor_msgs REQUIRED)
+find_package(nav_msgs REQUIRED) # rgbd
+find_package(cv_bridge)
 find_package(Eigen3 3.1.0 REQUIRED)
 find_package(Pangolin REQUIRED)
+find_package(rcutils REQUIRED)
 
 include_directories(
 ${PROJECT_SOURCE_DIR}
@@ -62,58 +61,55 @@ ${PROJECT_SOURCE_DIR}/../../../lib/libORB_SLAM3.so
 -lboost_system
 )
 
-# Node for monocular camera
-rosbuild_add_executable(Mono
-src/ros_mono.cc
+set(dependencies
+  rclcpp
+  sensor_msgs
+  nav_msgs
+  cv_bridge
 )
 
-target_link_libraries(Mono
-${LIBS}
-)
-
-# Node for monocular camera (Augmented Reality Demo)
-rosbuild_add_executable(MonoAR
-src/AR/ros_mono_ar.cc
-src/AR/ViewerAR.h
-src/AR/ViewerAR.cc
-)
-
-target_link_libraries(MonoAR
-${LIBS}
-)
-
-# Node for stereo camera
-rosbuild_add_executable(Stereo
-src/ros_stereo.cc
-)
-
-target_link_libraries(Stereo
-${LIBS}
+install(
+  DIRECTORY include/
+  DESTINATION include
 )
 
 # Node for RGB-D camera
-rosbuild_add_executable(RGBD
-src/ros_rgbd.cc
+add_executable(RGBD
+src/rgbd_node.cpp
+)
+
+ament_target_dependencies(RGBD
+${dependencies}
 )
 
 target_link_libraries(RGBD
 ${LIBS}
 )
 
-# Node for monocular-inertial camera
-rosbuild_add_executable(Mono_Inertial
-src/ros_mono_inertial.cc
+target_include_directories(RGBD PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+
+install(TARGETS RGBD
+  DESTINATION lib/${PROJECT_NAME})
+
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  # the following line skips the linter which checks for copyrights
+  # uncomment the line when a copyright and license is not present in all source files
+  #set(ament_cmake_copyright_FOUND TRUE)
+  # the following line skips cpplint (only works in a git repo)
+  # uncomment the line when this package is not in a git repo
+  #set(ament_cmake_cpplint_FOUND TRUE)
+  ament_lint_auto_find_test_dependencies()
+endif()
+
+ament_export_include_directories(
+  include
 )
 
-target_link_libraries(Mono_Inertial
-${LIBS}
+ament_export_targets(
+  export_${PROJECT_NAME}
 )
 
-# Node for stereo-inertial camera
-rosbuild_add_executable(Stereo_Inertial
-src/ros_stereo_inertial.cc
-)
-
-target_link_libraries(Stereo_Inertial
-${LIBS}
-)
+ament_package()
